@@ -134,7 +134,7 @@ export const LibraryPage: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredApps.map((app, i) => (
-            <AppCard key={i} app={app} />
+            <AppCard key={app.bundleIdentifier || app.downloadURL || i} app={app} />
           ))}
         </div>
       )}

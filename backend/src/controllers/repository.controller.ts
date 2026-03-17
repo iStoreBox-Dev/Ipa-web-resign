@@ -3,7 +3,6 @@ import { AuthRequest } from '../middleware/auth';
 import { prisma } from '../config/database';
 import { logger } from '../utils/logger';
 import https from 'https';
-import http from 'http';
 
 export async function listRepositories(_req: Request, res: Response): Promise<void> {
   try {
@@ -23,6 +22,13 @@ export async function addRepository(req: AuthRequest, res: Response): Promise<vo
 
     if (!url || !name) {
       res.status(400).json({ error: 'URL and name are required' });
+      return;
+    }
+
+    try {
+      validateRepoUrl(url);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
       return;
     }
 
@@ -106,19 +112,60 @@ export async function deleteRepository(req: AuthRequest, res: Response): Promise
   }
 }
 
+const ALLOWED_REPO_PROTOCOLS = ['https:'];
+const REQUEST_TIMEOUT_MS = 10000;
+
+function validateRepoUrl(url: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error('Invalid URL');
+  }
+  if (!ALLOWED_REPO_PROTOCOLS.includes(parsed.protocol)) {
+    throw new Error('Only HTTPS URLs are allowed');
+  }
+  // Block private/loopback addresses
+  const hostname = parsed.hostname;
+  if (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '0.0.0.0' ||
+    hostname.startsWith('192.168.') ||
+    hostname.startsWith('10.') ||
+    hostname.startsWith('172.16.') ||
+    hostname === '::1' ||
+    hostname.endsWith('.internal') ||
+    hostname.endsWith('.local')
+  ) {
+    throw new Error('Private/internal URLs are not allowed');
+  }
+}
+
 function fetchJsonFromUrl(url: string, callback: (error: Error | null, data: any) => void): void {
-  const protocol = url.startsWith('https') ? https : http;
-  protocol.get(url, (response) => {
+  try {
+    validateRepoUrl(url);
+  } catch (err: any) {
+    callback(new Error(err.message), null);
+    return;
+  }
+
+  const req = https.get(url, { timeout: REQUEST_TIMEOUT_MS }, (response) => {
     let data = '';
     response.on('data', (chunk) => (data += chunk));
     response.on('end', () => {
       try {
         callback(null, JSON.parse(data));
       } catch {
-        callback(new Error('Invalid JSON'), null);
+        callback(new Error('Invalid JSON response'), null);
       }
     });
-  }).on('error', (error) => {
+  });
+  req.on('timeout', () => {
+    req.destroy();
+    callback(new Error('Request timed out'), null);
+  });
+  req.on('error', (error) => {
     callback(error, null);
   });
 }

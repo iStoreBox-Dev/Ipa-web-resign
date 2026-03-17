@@ -7,9 +7,10 @@ if (NODE_ENV === 'production' && !encryptionKeyRaw) {
   throw new Error('ENCRYPTION_KEY environment variable must be set in production');
 }
 
-const ENCRYPTION_KEY_RAW = encryptionKeyRaw || 'dev-encryption-key-32chars-padded';
-// Ensure key is exactly 32 bytes for AES-256
-const ENCRYPTION_KEY = Buffer.from(ENCRYPTION_KEY_RAW.padEnd(32, '0').slice(0, 32));
+const KEY_INPUT = encryptionKeyRaw || 'dev-encryption-key-change-in-production';
+const SALT = Buffer.from('ipa-resign-static-salt-v1');
+// Derive a 32-byte key using scrypt for consistent key length regardless of input length
+const ENCRYPTION_KEY = crypto.scryptSync(KEY_INPUT, SALT, 32);
 const IV_LENGTH = 16;
 
 export function encrypt(text: string): string {

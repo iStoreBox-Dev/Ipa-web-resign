@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
 import { FileDropzone } from '../../components/Common/FileDropzone';
@@ -21,6 +21,8 @@ export const HomePage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [socket, setSocket] = useState<Socket | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     // Load certificates and recent jobs
@@ -39,7 +41,11 @@ export const HomePage: React.FC = () => {
     // Setup socket
     const s = io({ path: '/socket.io' });
     setSocket(s);
-    return () => { s.disconnect(); };
+    return () => {
+      s.disconnect();
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+    };
   }, []);
 
   const handleFileDrop = (files: File[]) => {
@@ -81,12 +87,13 @@ export const HomePage: React.FC = () => {
       }
 
       // Poll as fallback
-      const poll = setInterval(async () => {
+      pollIntervalRef.current = setInterval(async () => {
         try {
           const updated = await resignApi.get(job.id);
           const updatedJob = updated.data.job as ResignJob;
           if (updatedJob.status === 'success' || updatedJob.status === 'failed') {
-            clearInterval(poll);
+            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+            if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
             setCurrentJob(updatedJob);
             setLoading(false);
             setProgress(100);
@@ -94,7 +101,9 @@ export const HomePage: React.FC = () => {
         } catch {}
       }, 2000);
 
-      setTimeout(() => clearInterval(poll), 60000);
+      pollTimeoutRef.current = setTimeout(() => {
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      }, 60000);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to submit job');
       setLoading(false);
