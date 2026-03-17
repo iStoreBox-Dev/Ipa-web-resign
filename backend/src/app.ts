@@ -22,12 +22,30 @@ app.use(cors({
 }));
 
 // Rate limiting
-const limiter = rateLimit({
+const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
   message: { error: 'Too many requests, please try again later' },
 });
-app.use('/api/auth', limiter);
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  message: { error: 'Too many requests, please try again later' },
+});
+
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 50,
+  message: { error: 'Too many upload requests, please try again later' },
+});
+
+app.use('/api/auth', authLimiter);
+app.use('/api/users', apiLimiter);
+app.use('/api/admin', apiLimiter);
+app.use('/api/repositories', apiLimiter);
+app.use('/api/certificates', uploadLimiter);
+app.use('/api/resign', uploadLimiter);
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
