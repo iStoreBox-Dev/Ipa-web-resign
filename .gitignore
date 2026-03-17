@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+*.db
+*.db-journal
+uploads/
+frontend/dist/
+backend/prisma/migrations/
+backend/test.db
