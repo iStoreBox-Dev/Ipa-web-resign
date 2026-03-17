@@ -1,6 +1,13 @@
 import jwt from 'jsonwebtoken';
 
-export const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const jwtSecret = process.env.JWT_SECRET;
+
+if (NODE_ENV === 'production' && !jwtSecret) {
+  throw new Error('JWT_SECRET environment variable must be set in production');
+}
+
+export const JWT_SECRET = jwtSecret || 'fallback-dev-secret-key';
 export const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 export interface JwtPayload {

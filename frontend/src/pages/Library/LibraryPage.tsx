@@ -46,14 +46,19 @@ export const LibraryPage: React.FC = () => {
     }
   };
 
+  const [addError, setAddError] = useState('');
+
   const handleAddRepo = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAddError('');
     try {
       await repositoryApi.add(newRepo);
       await loadRepositories();
       setShowAddModal(false);
       setNewRepo({ url: '', name: '', description: '' });
-    } catch {}
+    } catch (err: any) {
+      setAddError(err.response?.data?.error || 'Failed to add repository');
+    }
   };
 
   const filteredApps = apps.filter((app) => {
@@ -137,6 +142,11 @@ export const LibraryPage: React.FC = () => {
       {/* Add Repository Modal */}
       <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} title="Add Repository">
         <form onSubmit={handleAddRepo} className="space-y-4">
+          {addError && (
+            <div className="px-4 py-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl">
+              <p className="text-sm text-red-600 dark:text-red-400">{addError}</p>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1.5">Repository URL</label>
             <input

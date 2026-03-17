@@ -143,13 +143,10 @@ export async function downloadResignedIpa(req: AuthRequest, res: Response): Prom
       return;
     }
 
-    // Find the resigned file by job ID pattern
+    // Files are named `<jobId>-<originalBase>-resigned.ipa` — look up by jobId prefix
     const resignedDir = path.join(process.env.UPLOAD_DIR || './uploads', 'resigned');
-    const files = fs.readdirSync(resignedDir).filter((f) => f.includes('resigned'));
-
-    // The download URL stores the job ID, use the original filename pattern
-    const originalBase = path.basename(job.ipaFilename, path.extname(job.ipaFilename));
-    const resignedFile = files.find((f) => f.startsWith(originalBase + '-resigned'));
+    const files = fs.readdirSync(resignedDir);
+    const resignedFile = files.find((f) => f.startsWith(id + '-'));
 
     if (!resignedFile) {
       res.status(404).json({ error: 'Resigned file not found on disk' });

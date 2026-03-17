@@ -48,10 +48,11 @@ export function copyFile(src: string, dest: string): void {
   fs.copyFileSync(src, dest);
 }
 
-export function generateOutputFilename(originalName: string): string {
+export function generateOutputFilename(originalName: string, jobId: string): string {
   const ext = path.extname(originalName);
   const base = path.basename(originalName, ext);
-  return `${base}-resigned-${uuidv4().slice(0, 8)}${ext}`;
+  // Use jobId prefix so the file can be found deterministically by job ID
+  return `${jobId}-${base}-resigned${ext}`;
 }
 
 ensureDirectories();

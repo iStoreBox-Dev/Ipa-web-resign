@@ -36,7 +36,7 @@ async function simulateResigning(options: ResignOptions): Promise<string> {
     if (onProgress) onProgress(step.progress, step.message);
   }
 
-  const outputFilename = generateOutputFilename(options.ipaFilename);
+  const outputFilename = generateOutputFilename(options.ipaFilename, options.jobId);
   const outputPath = getOutputPath(outputFilename);
 
   // Simulate by copying the original IPA

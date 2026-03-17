@@ -1,6 +1,13 @@
 import crypto from 'crypto';
 
-const ENCRYPTION_KEY_RAW = process.env.ENCRYPTION_KEY || 'dev-encryption-key-32chars-padded';
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const encryptionKeyRaw = process.env.ENCRYPTION_KEY;
+
+if (NODE_ENV === 'production' && !encryptionKeyRaw) {
+  throw new Error('ENCRYPTION_KEY environment variable must be set in production');
+}
+
+const ENCRYPTION_KEY_RAW = encryptionKeyRaw || 'dev-encryption-key-32chars-padded';
 // Ensure key is exactly 32 bytes for AES-256
 const ENCRYPTION_KEY = Buffer.from(ENCRYPTION_KEY_RAW.padEnd(32, '0').slice(0, 32));
 const IV_LENGTH = 16;

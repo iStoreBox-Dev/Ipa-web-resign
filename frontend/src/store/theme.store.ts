@@ -43,5 +43,7 @@ if (stored) {
   try {
     const { state } = JSON.parse(stored);
     applyTheme(state.theme);
-  } catch {}
+  } catch (e) {
+    console.warn('Failed to parse stored theme preference:', e);
+  }
 }
