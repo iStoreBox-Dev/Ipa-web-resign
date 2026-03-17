@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import {
   getDashboardStats,
   listUsers,
@@ -12,6 +13,13 @@ import { requireAdmin } from '../middleware/admin';
 
 const router = Router();
 
+const adminRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  message: { error: 'Too many requests, please try again later' },
+});
+
+router.use(adminRateLimit);
 router.use(authenticate);
 router.use(requireAdmin);
 

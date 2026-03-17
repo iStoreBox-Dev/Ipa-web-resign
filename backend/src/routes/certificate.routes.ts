@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import {
   uploadCertificate,
   listCertificates,
@@ -11,6 +12,13 @@ import { uploadCertificate as uploadMiddleware } from '../middleware/upload';
 
 const router = Router();
 
+const certRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 50,
+  message: { error: 'Too many requests, please try again later' },
+});
+
+router.use(certRateLimit);
 router.use(authenticate);
 
 router.get('/', listCertificates);
