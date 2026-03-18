@@ -94,6 +94,32 @@ export async function listCertificates(req: AuthRequest, res: Response): Promise
   }
 }
 
+export async function listPublicCertificates(_req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const certificates = await prisma.certificate.findMany({
+      where: { isPublic: true },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        filename: true,
+        certificateType: true,
+        expiryDate: true,
+        bundleId: true,
+        teamId: true,
+        teamName: true,
+        isPublic: true,
+        usageCount: true,
+        createdAt: true,
+      },
+    });
+
+    res.json({ certificates });
+  } catch (error) {
+    logger.error('ListPublicCertificates error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
 export async function getCertificate(req: AuthRequest, res: Response): Promise<void> {
   try {
     const { id } = req.params;

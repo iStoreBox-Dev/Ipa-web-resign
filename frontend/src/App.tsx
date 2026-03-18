@@ -6,6 +6,7 @@ import { LoginPage } from './pages/Auth/LoginPage';
 import { RegisterPage } from './pages/Auth/RegisterPage';
 import { HomePage } from './pages/Home/HomePage';
 import { LibraryPage } from './pages/Library/LibraryPage';
+import { PlansPage } from './pages/Plans/PlansPage';
 import { CertificatesPage } from './pages/Certificates/CertificatesPage';
 import { AccountPage } from './pages/Account/AccountPage';
 import { AdminDashboard } from './pages/Admin/AdminDashboard';
@@ -39,8 +40,9 @@ function App() {
         <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
 
         {/* Private routes with layout */}
-        <Route path="/" element={<PrivateRoute><Layout><HomePage /></Layout></PrivateRoute>} />
-        <Route path="/library" element={<PrivateRoute><Layout><LibraryPage /></Layout></PrivateRoute>} />
+        <Route path="/" element={<Layout><HomePage /></Layout>} />
+        <Route path="/library" element={<Layout><LibraryPage /></Layout>} />
+        <Route path="/plans" element={<Layout><PlansPage /></Layout>} />
         <Route path="/certificates" element={<PrivateRoute><Layout><CertificatesPage /></Layout></PrivateRoute>} />
         <Route path="/account" element={<PrivateRoute><Layout><AccountPage /></Layout></PrivateRoute>} />
 

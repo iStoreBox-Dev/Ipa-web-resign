@@ -1,8 +1,9 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
+import { useAuth } from '../../hooks/useAuth';
 
-const tabs = [
+const baseTabs = [
   {
     to: '/',
     label: 'Home',
@@ -22,6 +23,15 @@ const tabs = [
     ),
   },
   {
+    to: '/plans',
+    label: 'Plans',
+    icon: (active: boolean) => (
+      <svg className="w-6 h-6" fill={active ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 0 : 1.5} d="M12 8c-1.657 0-3 1.12-3 2.5S10.343 13 12 13s3 1.12 3 2.5S13.657 18 12 18m0-10V6m0 12v-2m9-4a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+  {
     to: '/account',
     label: 'Account',
     icon: (active: boolean) => (
@@ -32,7 +42,22 @@ const tabs = [
   },
 ];
 
+const guestTabs = [
+  {
+    to: '/login',
+    label: 'Login',
+    icon: (active: boolean) => (
+      <svg className="w-6 h-6" fill={active ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 0 : 1.5} d="M15 12H3m0 0l4-4m-4 4l4 4m13-8v10a2 2 0 01-2 2h-5a2 2 0 01-2-2v-3" />
+      </svg>
+    ),
+  },
+];
+
 export const BottomNav: React.FC = () => {
+  const { isAuthenticated } = useAuth();
+  const tabs = isAuthenticated ? baseTabs : [...baseTabs.slice(0, 3), ...guestTabs];
+
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl border-t border-gray-200 dark:border-zinc-800 pb-safe">
       <div className="flex items-center justify-around px-2 py-2">

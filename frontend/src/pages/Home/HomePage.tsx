@@ -5,16 +5,29 @@ import { FileDropzone } from '../../components/Common/FileDropzone';
 import { Button } from '../../components/Common/Button';
 import { Card, CardHeader } from '../../components/Common/Card';
 import { Badge, statusToBadge } from '../../components/Common/Badge';
-import { resignApi, certificateApi } from '../../services/api';
-import type { Certificate, ResignJob } from '../../types';
+import { resignApi, certificateApi, repositoryApi } from '../../services/api';
+import type { Certificate, ResignJob, Repository, RepositoryApp } from '../../types';
 import { formatDistanceToNow } from 'date-fns';
+import { useAuth } from '../../hooks/useAuth';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
+  const hasPremium = !!user?.isSubscribed;
   const [ipaFile, setIpaFile] = useState<File | null>(null);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [selectedCertId, setSelectedCertId] = useState('');
   const [recentJobs, setRecentJobs] = useState<ResignJob[]>([]);
+  const [repositories, setRepositories] = useState<Repository[]>([]);
+  const [featuredApps, setFeaturedApps] = useState<RepositoryApp[]>([]);
+  const [loadingApps, setLoadingApps] = useState(false);
+  const [currentJobAccessToken, setCurrentJobAccessToken] = useState<string | null>(null);
+  const [premiumOptions, setPremiumOptions] = useState({
+    appName: '',
+    bundleId: '',
+    version: '',
+    injectTweaks: false,
+  });
   const [currentJob, setCurrentJob] = useState<ResignJob | null>(null);
   const [progress, setProgress] = useState(0);
   const [progressMsg, setProgressMsg] = useState('');
@@ -28,12 +41,46 @@ export const HomePage: React.FC = () => {
     // Load certificates and recent jobs
     const loadData = async () => {
       try {
-        const [certRes, jobRes] = await Promise.all([
-          certificateApi.list(),
-          resignApi.list({ limit: 5 }),
-        ]);
-        setCertificates(certRes.data.certificates || []);
-        setRecentJobs(jobRes.data.jobs || []);
+        if (isAuthenticated) {
+          const [certRes, jobRes, repoRes] = await Promise.all([
+            certificateApi.list(),
+            resignApi.list({ limit: 5 }),
+            repositoryApi.list(),
+          ]);
+          setCertificates(certRes.data.certificates || []);
+          setRecentJobs(jobRes.data.jobs || []);
+          const repos = repoRes.data.repositories || [];
+          setRepositories(repos);
+          setFeaturedApps([]);
+          if (repos.length > 0) {
+            setLoadingApps(true);
+            try {
+              const appsRes = await repositoryApi.getApps(repos[0].id);
+              setFeaturedApps((appsRes.data.apps || []).slice(0, 12));
+            } finally {
+              setLoadingApps(false);
+            }
+          }
+        } else {
+          const [certRes, repoRes] = await Promise.all([
+            certificateApi.listPublic(),
+            repositoryApi.list(),
+          ]);
+          setCertificates(certRes.data.certificates || []);
+          setRecentJobs([]);
+          const repos = repoRes.data.repositories || [];
+          setRepositories(repos);
+          setFeaturedApps([]);
+          if (repos.length > 0) {
+            setLoadingApps(true);
+            try {
+              const appsRes = await repositoryApi.getApps(repos[0].id);
+              setFeaturedApps((appsRes.data.apps || []).slice(0, 12));
+            } finally {
+              setLoadingApps(false);
+            }
+          }
+        }
       } catch {}
     };
     loadData();
@@ -46,7 +93,7 @@ export const HomePage: React.FC = () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
       if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
     };
-  }, []);
+  }, [isAuthenticated]);
 
   const handleFileDrop = (files: File[]) => {
     if (files[0]) setIpaFile(files[0]);
@@ -63,10 +110,18 @@ export const HomePage: React.FC = () => {
       const formData = new FormData();
       formData.append('ipa', ipaFile);
       if (selectedCertId) formData.append('certificateId', selectedCertId);
+      if (hasPremium) {
+        if (premiumOptions.appName.trim()) formData.append('appName', premiumOptions.appName.trim());
+        if (premiumOptions.bundleId.trim()) formData.append('bundleId', premiumOptions.bundleId.trim());
+        if (premiumOptions.version.trim()) formData.append('version', premiumOptions.version.trim());
+        if (premiumOptions.injectTweaks) formData.append('injectTweaks', 'true');
+      }
 
       const res = await resignApi.submit(formData);
       const job = res.data.job as ResignJob;
+      const accessToken = (res.data.accessToken as string | undefined) || null;
       setCurrentJob(job);
+      setCurrentJobAccessToken(accessToken);
       setProgressMsg('Job queued...');
 
       // Listen for progress
@@ -89,7 +144,7 @@ export const HomePage: React.FC = () => {
       // Poll as fallback
       pollIntervalRef.current = setInterval(async () => {
         try {
-          const updated = await resignApi.get(job.id);
+          const updated = await resignApi.get(job.id, accessToken || undefined);
           const updatedJob = updated.data.job as ResignJob;
           if (updatedJob.status === 'success' || updatedJob.status === 'failed') {
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
@@ -110,9 +165,9 @@ export const HomePage: React.FC = () => {
     }
   };
 
-  const handleDownload = async (jobId: string) => {
+  const handleDownload = async (jobId: string, accessToken?: string | null) => {
     try {
-      const res = await resignApi.download(jobId);
+      const res = await resignApi.download(jobId, accessToken || undefined);
       const blob = new Blob([res.data], { type: 'application/octet-stream' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -126,6 +181,8 @@ export const HomePage: React.FC = () => {
   const resetForm = () => {
     setIpaFile(null);
     setCurrentJob(null);
+    setCurrentJobAccessToken(null);
+    setPremiumOptions({ appName: '', bundleId: '', version: '', injectTweaks: false });
     setProgress(0);
     setProgressMsg('');
     setError('');
@@ -176,20 +233,69 @@ export const HomePage: React.FC = () => {
                   <option value="">No certificate selected</option>
                   {certificates.map((cert) => (
                     <option key={cert.id} value={cert.id}>
-                      {cert.filename} {cert.teamName ? `— ${cert.teamName}` : ''}
+                      {cert.filename} {cert.teamName ? `— ${cert.teamName}` : ''} {cert.isPublic ? '(Free)' : ''}
                     </option>
                   ))}
                 </select>
               </div>
             )}
 
-            {certificates.length === 0 && (
+            {certificates.length === 0 && isAuthenticated && (
               <p className="text-sm text-gray-500 dark:text-zinc-400 text-center">
                 No certificates uploaded yet.{' '}
                 <button onClick={() => navigate('/certificates')} className="text-brand-500 hover:text-brand-600">
                   Add one
                 </button>
               </p>
+            )}
+
+            {certificates.length === 0 && !isAuthenticated && (
+              <p className="text-sm text-gray-500 dark:text-zinc-400 text-center">
+                Free resigning is temporarily unavailable because no public certificate is configured.
+              </p>
+            )}
+
+            {hasPremium ? (
+              <div className="p-3 rounded-xl border border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-800/40 space-y-3">
+                <p className="text-xs font-semibold tracking-wide text-gray-500 dark:text-zinc-400 uppercase">Premium options</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="New app name"
+                    value={premiumOptions.appName}
+                    onChange={(e) => setPremiumOptions((s) => ({ ...s, appName: e.target.value }))}
+                  />
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="New bundle id"
+                    value={premiumOptions.bundleId}
+                    onChange={(e) => setPremiumOptions((s) => ({ ...s, bundleId: e.target.value }))}
+                  />
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="New version"
+                    value={premiumOptions.version}
+                    onChange={(e) => setPremiumOptions((s) => ({ ...s, version: e.target.value }))}
+                  />
+                </div>
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-zinc-300">
+                  <input
+                    type="checkbox"
+                    checked={premiumOptions.injectTweaks}
+                    onChange={(e) => setPremiumOptions((s) => ({ ...s, injectTweaks: e.target.checked }))}
+                  />
+                  Inject tweaks
+                </label>
+              </div>
+            ) : (
+              <div className="px-4 py-3 rounded-xl border border-amber-200/70 dark:border-amber-500/30 bg-amber-50/70 dark:bg-amber-500/10">
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  Free plan includes standard resign with public certificates. Rename app/bundle/version and tweak injection are premium features.
+                </p>
+              </div>
             )}
 
             {error && (
@@ -236,7 +342,7 @@ export const HomePage: React.FC = () => {
                   <p className="text-sm text-gray-500 dark:text-zinc-400 mt-0.5">Your IPA has been signed successfully</p>
                 </div>
                 <div className="flex gap-3 justify-center">
-                  <Button onClick={() => handleDownload(currentJob.id)}>
+                  <Button onClick={() => handleDownload(currentJob.id, currentJobAccessToken)}>
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
@@ -277,7 +383,7 @@ export const HomePage: React.FC = () => {
       </Card>
 
       {/* Recent Jobs */}
-      {recentJobs.length > 0 && (
+      {isAuthenticated && recentJobs.length > 0 && (
         <Card>
           <CardHeader title="Recent Jobs" />
           <div className="space-y-2">
@@ -307,6 +413,42 @@ export const HomePage: React.FC = () => {
           </div>
         </Card>
       )}
+
+      <Card>
+        <CardHeader
+          title="Free IPA Library"
+          subtitle={repositories.length > 0 ? `Showing apps from ${repositories[0]?.name || 'repository'}` : 'No repositories configured'}
+        />
+        {loadingApps ? (
+          <p className="text-sm text-gray-500 dark:text-zinc-400">Loading apps...</p>
+        ) : featuredApps.length === 0 ? (
+          <p className="text-sm text-gray-500 dark:text-zinc-400">No apps available right now.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {featuredApps.map((app, index) => (
+              <div key={app.bundleIdentifier || app.downloadURL || index} className="p-3 rounded-xl border border-gray-100 dark:border-zinc-800 bg-white dark:bg-zinc-900/40">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-zinc-100 truncate">{app.name || 'Unknown app'}</p>
+                    <p className="text-xs text-gray-500 dark:text-zinc-400 truncate">{app.bundleIdentifier || app.developer || 'Unknown bundle'}</p>
+                    {app.version && <p className="text-xs text-gray-400 dark:text-zinc-500 mt-1">v{app.version}</p>}
+                  </div>
+                  {app.downloadURL && (
+                    <a
+                      href={app.downloadURL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs px-2.5 py-1.5 rounded-lg bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 hover:bg-brand-100 dark:hover:bg-brand-500/20"
+                    >
+                      Download
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
     </div>
   );
 };

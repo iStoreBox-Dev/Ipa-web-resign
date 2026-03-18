@@ -17,7 +17,7 @@ export const AdminUsers: React.FC = () => {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [editForm, setEditForm] = useState({ isAdmin: false, isBanned: false, storageQuota: 1073741824 });
+  const [editForm, setEditForm] = useState({ isAdmin: false, isBanned: false, isSubscribed: false, storageQuota: 1073741824 });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -40,6 +40,7 @@ export const AdminUsers: React.FC = () => {
     setEditForm({
       isAdmin: user.isAdmin,
       isBanned: user.isBanned || false,
+      isSubscribed: user.isSubscribed || false,
       storageQuota: user.storageQuota || 1073741824,
     });
   };
@@ -110,6 +111,7 @@ export const AdminUsers: React.FC = () => {
                       <td className="py-3">
                         <div className="flex flex-wrap gap-1">
                           {user.isAdmin && <Badge variant="info">Admin</Badge>}
+                          {user.isSubscribed && <Badge variant="success">Subscribed</Badge>}
                           {user.isBanned && <Badge variant="error">Banned</Badge>}
                           {!user.isAdmin && !user.isBanned && <Badge>User</Badge>}
                         </div>
@@ -169,6 +171,16 @@ export const AdminUsers: React.FC = () => {
               checked={editForm.isBanned}
               onChange={(e) => setEditForm({ ...editForm, isBanned: e.target.checked })}
               className="w-4 h-4 rounded text-red-500"
+            />
+          </label>
+
+          <label className="flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-700 dark:text-zinc-300">Subscribed</span>
+            <input
+              type="checkbox"
+              checked={editForm.isSubscribed}
+              onChange={(e) => setEditForm({ ...editForm, isSubscribed: e.target.checked })}
+              className="w-4 h-4 rounded text-green-500"
             />
           </label>
 

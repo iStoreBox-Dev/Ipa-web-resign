@@ -36,12 +36,14 @@ export async function register(req: Request, res: Response): Promise<void> {
         password: hashedPassword,
         username,
         isAdmin: userCount === 0, // first user is admin
+        isSubscribed: userCount === 0,
       },
       select: {
         id: true,
         email: true,
         username: true,
         isAdmin: true,
+        isSubscribed: true,
         createdAt: true,
       },
     });
@@ -50,6 +52,7 @@ export async function register(req: Request, res: Response): Promise<void> {
       userId: user.id,
       email: user.email,
       isAdmin: user.isAdmin,
+      isSubscribed: user.isSubscribed,
     });
 
     logger.info(`New user registered: ${user.email}`);
@@ -90,6 +93,7 @@ export async function login(req: Request, res: Response): Promise<void> {
       userId: user.id,
       email: user.email,
       isAdmin: user.isAdmin,
+      isSubscribed: user.isSubscribed,
     });
 
     logger.info(`User logged in: ${user.email}`);
@@ -100,6 +104,7 @@ export async function login(req: Request, res: Response): Promise<void> {
         email: user.email,
         username: user.username,
         isAdmin: user.isAdmin,
+        isSubscribed: user.isSubscribed,
         avatar: user.avatar,
       },
     });
@@ -119,6 +124,7 @@ export async function getMe(req: any, res: Response): Promise<void> {
         username: true,
         avatar: true,
         isAdmin: true,
+        isSubscribed: true,
         storageQuota: true,
         usedStorage: true,
         createdAt: true,

@@ -99,6 +99,7 @@ export const AccountPage: React.FC = () => {
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">{user?.username}</h2>
               <p className="text-sm text-gray-500 dark:text-zinc-400">{user?.email}</p>
               {user?.isAdmin && <Badge variant="info" className="mt-1">Admin</Badge>}
+              {user?.isSubscribed && <Badge variant="success" className="mt-1 ml-2">Subscribed</Badge>}
             </div>
           </div>
           <Button size="sm" variant="secondary" onClick={() => setEditMode(!editMode)}>

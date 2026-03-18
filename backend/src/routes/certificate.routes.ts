@@ -3,6 +3,7 @@ import rateLimit from 'express-rate-limit';
 import {
   uploadCertificate,
   listCertificates,
+  listPublicCertificates,
   getCertificate,
   deleteCertificate,
   updateCertificate,
@@ -19,6 +20,9 @@ const certRateLimit = rateLimit({
 });
 
 router.use(certRateLimit);
+
+router.get('/public', listPublicCertificates);
+
 router.use(authenticate);
 
 router.get('/', listCertificates);

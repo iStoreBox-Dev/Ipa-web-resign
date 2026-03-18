@@ -50,11 +50,15 @@ export const userApi = {
     api.post('/users/change-password', data),
   getResignHistory: (params?: { page?: number; limit?: number }) =>
     api.get('/users/resign-history', { params }),
+  startBillingCheckout: (data: { plan?: 'pro' | 'enterprise' }) =>
+    api.post('/users/billing/checkout', data),
+  verifySubscription: () => api.get('/users/subscription/verify'),
 };
 
 // Certificate API
 export const certificateApi = {
   list: () => api.get('/certificates'),
+  listPublic: () => api.get('/certificates/public'),
   upload: (formData: FormData) =>
     api.post('/certificates', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -73,9 +77,13 @@ export const resignApi = {
     }),
   list: (params?: { page?: number; limit?: number }) =>
     api.get('/resign', { params }),
-  get: (id: string) => api.get(`/resign/${id}`),
-  download: (id: string) =>
-    api.get(`/resign/download/${id}`, { responseType: 'blob' }),
+  get: (id: string, accessToken?: string) =>
+    api.get(`/resign/${id}`, { params: accessToken ? { accessToken } : undefined }),
+  download: (id: string, accessToken?: string) =>
+    api.get(`/resign/download/${id}`, {
+      responseType: 'blob',
+      params: accessToken ? { accessToken } : undefined,
+    }),
 };
 
 // Repository API
@@ -92,7 +100,7 @@ export const adminApi = {
   getStats: () => api.get('/admin/stats'),
   listUsers: (params?: { page?: number; limit?: number; search?: string }) =>
     api.get('/admin/users', { params }),
-  updateUser: (id: string, data: Partial<{ isAdmin: boolean; isBanned: boolean; storageQuota: number; password: string }>) =>
+  updateUser: (id: string, data: Partial<{ isAdmin: boolean; isBanned: boolean; isSubscribed: boolean; storageQuota: number; password: string }>) =>
     api.patch(`/admin/users/${id}`, data),
   deleteUser: (id: string) => api.delete(`/admin/users/${id}`),
   listCertificates: (params?: { page?: number; limit?: number }) =>

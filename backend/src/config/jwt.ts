@@ -14,6 +14,7 @@ export interface JwtPayload {
   userId: string;
   email: string;
   isAdmin: boolean;
+  isSubscribed: boolean;
 }
 
 export function signToken(payload: JwtPayload): string {

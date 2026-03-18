@@ -6,7 +6,8 @@ import {
   listResignJobs,
   downloadResignedIpa,
 } from '../controllers/resign.controller';
-import { authenticate } from '../middleware/auth';
+import { authenticate, authenticateOptional } from '../middleware/auth';
+import { guardPremiumResignOptions } from '../middleware/premium';
 import { uploadIpa } from '../middleware/upload';
 
 const router = Router();
@@ -18,10 +19,10 @@ const resignRateLimit = rateLimit({
 });
 
 router.use(resignRateLimit);
-router.use(authenticate);
+router.use(authenticateOptional);
 
-router.post('/', uploadIpa, submitResignJob);
-router.get('/', listResignJobs);
+router.post('/', uploadIpa, guardPremiumResignOptions, submitResignJob);
+router.get('/', authenticate, listResignJobs);
 router.get('/:id', getResignJob);
 router.get('/download/:id', downloadResignedIpa);
 

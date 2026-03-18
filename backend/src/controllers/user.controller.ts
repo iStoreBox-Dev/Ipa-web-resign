@@ -14,6 +14,7 @@ export async function getProfile(req: AuthRequest, res: Response): Promise<void>
         username: true,
         avatar: true,
         isAdmin: true,
+        isSubscribed: true,
         storageQuota: true,
         usedStorage: true,
         createdAt: true,
@@ -61,6 +62,7 @@ export async function updateProfile(req: AuthRequest, res: Response): Promise<vo
         username: true,
         avatar: true,
         isAdmin: true,
+        isSubscribed: true,
       },
     });
 
@@ -128,6 +130,26 @@ export async function getResignHistory(req: AuthRequest, res: Response): Promise
     res.json({ jobs, total, page, limit });
   } catch (error) {
     logger.error('GetResignHistory error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+export async function createBillingPlaceholderSession(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const plan = (req.body?.plan as string) || 'pro';
+    const userId = req.user!.userId;
+
+    const checkoutRef = `placeholder_${userId}_${Date.now()}`;
+
+    res.json({
+      checkoutRef,
+      plan,
+      status: 'placeholder',
+      message: 'Billing provider is not configured yet. This is a placeholder checkout response.',
+      nextStep: 'Integrate Stripe/LemonSqueezy webhook and checkout session creation here.',
+    });
+  } catch (error) {
+    logger.error('CreateBillingPlaceholderSession error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }

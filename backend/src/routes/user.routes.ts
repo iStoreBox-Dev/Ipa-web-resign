@@ -1,7 +1,14 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
-import { getProfile, updateProfile, changePassword, getResignHistory } from '../controllers/user.controller';
+import {
+  getProfile,
+  updateProfile,
+  changePassword,
+  getResignHistory,
+  createBillingPlaceholderSession,
+} from '../controllers/user.controller';
 import { authenticate } from '../middleware/auth';
+import { requireSubscription } from '../middleware/premium';
 
 const router = Router();
 
@@ -18,5 +25,9 @@ router.get('/profile', getProfile);
 router.patch('/profile', updateProfile);
 router.post('/change-password', changePassword);
 router.get('/resign-history', getResignHistory);
+router.post('/billing/checkout', createBillingPlaceholderSession);
+router.get('/subscription/verify', requireSubscription, (_req, res) => {
+  res.json({ active: true });
+});
 
 export default router;

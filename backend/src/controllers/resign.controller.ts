@@ -7,6 +7,8 @@ import { getOutputPath, fileExists } from '../services/storage.service';
 import { logger } from '../utils/logger';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
+import { hashPassword } from '../utils/crypto';
 
 let io: any = null;
 
@@ -20,6 +22,49 @@ function emitProgress(jobId: string, progress: number, message: string): void {
   }
 }
 
+async function getOrCreateGuestUserId(): Promise<string> {
+  const guestEmail = 'guest@system.local';
+  const guestUsername = 'guest_system';
+
+  const existing = await prisma.user.findUnique({
+    where: { email: guestEmail },
+    select: { id: true },
+  });
+
+  if (existing) {
+    return existing.id;
+  }
+
+  const password = await hashPassword(crypto.randomUUID());
+  const created = await prisma.user.create({
+    data: {
+      email: guestEmail,
+      username: guestUsername,
+      password,
+      isAdmin: false,
+      isSubscribed: false,
+      isBanned: false,
+    },
+    select: { id: true },
+  });
+
+  return created.id;
+}
+
+function getPublicJobAccessToken(req: AuthRequest): string | null {
+  const queryToken = req.query.accessToken;
+  if (typeof queryToken === 'string' && queryToken.trim()) {
+    return queryToken;
+  }
+
+  const headerToken = req.headers['x-job-access-token'];
+  if (typeof headerToken === 'string' && headerToken.trim()) {
+    return headerToken;
+  }
+
+  return null;
+}
+
 export async function submitResignJob(req: AuthRequest, res: Response): Promise<void> {
   try {
     if (!req.file) {
@@ -28,12 +73,43 @@ export async function submitResignJob(req: AuthRequest, res: Response): Promise<
     }
 
     const { certificateId } = req.body;
+    const isAuthenticated = !!req.user;
+
+    let resolvedCertificateId: string | undefined = certificateId;
+
+    // Guests can only use free/public certificates.
+    if (!isAuthenticated) {
+      if (certificateId) {
+        const cert = await prisma.certificate.findFirst({
+          where: { id: certificateId, isPublic: true },
+          select: { id: true },
+        });
+
+        if (!cert) {
+          res.status(403).json({ error: 'Public users can only use free certificates' });
+          return;
+        }
+      } else {
+        const defaultPublicCert = await prisma.certificate.findFirst({
+          where: { isPublic: true },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true },
+        });
+
+        if (!defaultPublicCert) {
+          res.status(400).json({ error: 'No free certificate available right now' });
+          return;
+        }
+
+        resolvedCertificateId = defaultPublicCert.id;
+      }
+    }
 
     // Verify certificate belongs to user if provided
-    if (certificateId) {
+    if (resolvedCertificateId && isAuthenticated) {
       const cert = await prisma.certificate.findFirst({
         where: {
-          id: certificateId,
+          id: resolvedCertificateId,
           OR: [{ userId: req.user!.userId }, { isPublic: true }],
         },
       });
@@ -43,11 +119,15 @@ export async function submitResignJob(req: AuthRequest, res: Response): Promise<
       }
     }
 
+    const jobOwnerId = req.user?.userId || (await getOrCreateGuestUserId());
+    const accessToken = req.user ? null : crypto.randomBytes(24).toString('hex');
+
     const job = await prisma.resignJob.create({
       data: {
-        userId: req.user!.userId,
+        userId: jobOwnerId,
         ipaFilename: req.file.filename,
-        certificateId: certificateId || null,
+        certificateId: resolvedCertificateId || null,
+        accessToken,
         status: 'pending',
         fileSize: req.file.size,
       },
@@ -57,9 +137,9 @@ export async function submitResignJob(req: AuthRequest, res: Response): Promise<
     resignQueue.add(job.id, 'resign', { jobId: job.id }, async () => {
       await processResignJob(
         job.id,
-        req.user!.userId,
+        jobOwnerId,
         req.file!.filename,
-        certificateId,
+        resolvedCertificateId,
         emitProgress
       );
 
@@ -69,8 +149,12 @@ export async function submitResignJob(req: AuthRequest, res: Response): Promise<
       }
     });
 
-    logger.info(`ResignJob ${job.id} queued for user ${req.user!.userId}`);
-    res.status(201).json({ job });
+    logger.info(`ResignJob ${job.id} queued for user ${jobOwnerId}`);
+    res.status(201).json({
+      job,
+      accessToken: accessToken || undefined,
+      isGuestJob: !req.user,
+    });
   } catch (error) {
     logger.error('SubmitResignJob error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -80,9 +164,10 @@ export async function submitResignJob(req: AuthRequest, res: Response): Promise<
 export async function getResignJob(req: AuthRequest, res: Response): Promise<void> {
   try {
     const { id } = req.params;
+    const accessToken = getPublicJobAccessToken(req);
 
-    const job = await prisma.resignJob.findFirst({
-      where: { id, userId: req.user!.userId },
+    const job = await prisma.resignJob.findUnique({
+      where: { id },
       include: {
         certificate: {
           select: { filename: true, teamName: true },
@@ -95,6 +180,20 @@ export async function getResignJob(req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
+    if (req.user) {
+      const ownedByUser = job.userId === req.user.userId;
+      const hasValidPublicToken = !!job.accessToken && accessToken === job.accessToken;
+      if (!ownedByUser && !hasValidPublicToken) {
+        res.status(404).json({ error: 'Job not found' });
+        return;
+      }
+    } else {
+      if (!job.accessToken || accessToken !== job.accessToken) {
+        res.status(401).json({ error: 'Valid job access token is required' });
+        return;
+      }
+    }
+
     res.json({ job });
   } catch (error) {
     logger.error('GetResignJob error:', error);
@@ -104,6 +203,11 @@ export async function getResignJob(req: AuthRequest, res: Response): Promise<voi
 
 export async function listResignJobs(req: AuthRequest, res: Response): Promise<void> {
   try {
+    if (!req.user) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const skip = (page - 1) * limit;
@@ -133,14 +237,29 @@ export async function listResignJobs(req: AuthRequest, res: Response): Promise<v
 export async function downloadResignedIpa(req: AuthRequest, res: Response): Promise<void> {
   try {
     const { id } = req.params;
+    const accessToken = getPublicJobAccessToken(req);
 
-    const job = await prisma.resignJob.findFirst({
-      where: { id, userId: req.user!.userId, status: 'success' },
+    const job = await prisma.resignJob.findUnique({
+      where: { id },
     });
 
-    if (!job) {
+    if (!job || job.status !== 'success') {
       res.status(404).json({ error: 'Resigned IPA not found' });
       return;
+    }
+
+    if (req.user) {
+      const ownedByUser = job.userId === req.user.userId;
+      const hasValidPublicToken = !!job.accessToken && accessToken === job.accessToken;
+      if (!ownedByUser && !hasValidPublicToken) {
+        res.status(404).json({ error: 'Resigned IPA not found' });
+        return;
+      }
+    } else {
+      if (!job.accessToken || accessToken !== job.accessToken) {
+        res.status(401).json({ error: 'Valid job access token is required' });
+        return;
+      }
     }
 
     // Files are named `<jobId>-<originalBase>-resigned.ipa` — look up by jobId prefix

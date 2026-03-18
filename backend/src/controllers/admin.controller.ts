@@ -83,6 +83,7 @@ export async function listUsers(req: AuthRequest, res: Response): Promise<void> 
           username: true,
           isAdmin: true,
           isBanned: true,
+          isSubscribed: true,
           storageQuota: true,
           usedStorage: true,
           createdAt: true,
@@ -108,7 +109,7 @@ export async function listUsers(req: AuthRequest, res: Response): Promise<void> 
 export async function updateUser(req: AuthRequest, res: Response): Promise<void> {
   try {
     const { id } = req.params;
-    const { isAdmin, isBanned, storageQuota, password } = req.body;
+    const { isAdmin, isBanned, isSubscribed, storageQuota, password } = req.body;
 
     if (id === req.user!.userId && isBanned === true) {
       res.status(400).json({ error: 'Cannot ban yourself' });
@@ -118,6 +119,7 @@ export async function updateUser(req: AuthRequest, res: Response): Promise<void>
     const updateData: any = {};
     if (isAdmin !== undefined) updateData.isAdmin = isAdmin;
     if (isBanned !== undefined) updateData.isBanned = isBanned;
+    if (isSubscribed !== undefined) updateData.isSubscribed = isSubscribed;
     if (storageQuota !== undefined) updateData.storageQuota = Number(storageQuota);
     if (password) updateData.password = await hashPassword(password);
 
@@ -130,6 +132,7 @@ export async function updateUser(req: AuthRequest, res: Response): Promise<void>
         username: true,
         isAdmin: true,
         isBanned: true,
+        isSubscribed: true,
         storageQuota: true,
       },
     });

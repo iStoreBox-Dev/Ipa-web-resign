@@ -5,6 +5,7 @@ export interface User {
   username: string;
   avatar?: string;
   isAdmin: boolean;
+  isSubscribed?: boolean;
   isBanned?: boolean;
   storageQuota?: number;
   usedStorage?: number;

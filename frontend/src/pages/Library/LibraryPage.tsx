@@ -5,8 +5,11 @@ import { Button } from '../../components/Common/Button';
 import { Modal } from '../../components/Common/Modal';
 import { PageLoader } from '../../components/Common/LoadingSpinner';
 import type { Repository, RepositoryApp } from '../../types';
+import { useAuth } from '../../hooks/useAuth';
 
 export const LibraryPage: React.FC = () => {
+  const { isAuthenticated, user } = useAuth();
+  const canManageRepos = !!isAuthenticated && (!!user?.isAdmin || !!user?.isSubscribed);
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [selectedRepo, setSelectedRepo] = useState<Repository | null>(null);
   const [apps, setApps] = useState<RepositoryApp[]>([]);
@@ -80,15 +83,21 @@ export const LibraryPage: React.FC = () => {
         <CardHeader
           title="App Library"
           subtitle="Browse apps from repositories"
-          action={
+          action={canManageRepos ? (
             <Button size="sm" variant="secondary" onClick={() => setShowAddModal(true)}>
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
               Add Repo
             </Button>
-          }
+          ) : undefined}
         />
+
+        {!canManageRepos && (
+          <p className="text-xs text-gray-500 dark:text-zinc-400 mb-3">
+            Repository management is available to subscribed users and admins.
+          </p>
+        )}
 
         <div className="flex gap-2 overflow-x-auto pb-1">
           {repositories.map((repo) => (

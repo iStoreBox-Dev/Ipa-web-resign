@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import { useAuth } from '../../hooks/useAuth';
 
-const navItems = [
+const baseNavItems = [
   {
     to: '/',
     label: 'Home',
@@ -22,6 +22,18 @@ const navItems = [
       </svg>
     ),
   },
+  {
+    to: '/plans',
+    label: 'Plans',
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 1.12-3 2.5S10.343 13 12 13s3 1.12 3 2.5S13.657 18 12 18m0-10V6m0 12v-2m9-4a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+];
+
+const authNavItems = [
   {
     to: '/certificates',
     label: 'Certificates',
@@ -43,8 +55,9 @@ const navItems = [
 ];
 
 export const Sidebar: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
+  const navItems = isAuthenticated ? [...baseNavItems, ...authNavItems] : baseNavItems;
 
   const handleLogout = async () => {
     await logout();
@@ -89,7 +102,7 @@ export const Sidebar: React.FC = () => {
           </NavLink>
         ))}
 
-        {user?.isAdmin && (
+        {isAuthenticated && user?.isAdmin && (
           <>
             <div className="pt-4 pb-2">
               <p className="px-3 text-xs font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">
@@ -118,24 +131,44 @@ export const Sidebar: React.FC = () => {
 
       {/* User footer */}
       <div className="px-3 py-4 border-t border-gray-100 dark:border-zinc-800">
-        <div className="flex items-center gap-3 px-3 py-2">
-          <div className="w-8 h-8 bg-brand-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-            {user?.username?.[0]?.toUpperCase() || 'U'}
+        {isAuthenticated ? (
+          <div className="flex items-center gap-3 px-3 py-2">
+            <div className="w-8 h-8 bg-brand-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+              {user?.username?.[0]?.toUpperCase() || 'U'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{user?.username}</p>
+              <p className="text-xs text-gray-400 dark:text-zinc-500 truncate">{user?.email}</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Sign out"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{user?.username}</p>
-            <p className="text-xs text-gray-400 dark:text-zinc-500 truncate">{user?.email}</p>
+        ) : (
+          <div className="px-3 py-2 space-y-2">
+            <p className="text-xs text-gray-500 dark:text-zinc-400">Browse and resign with free certificates. Login for premium tools.</p>
+            <div className="flex gap-2">
+              <button
+                className="flex-1 px-3 py-2 rounded-lg text-sm font-medium bg-brand-500 text-white hover:bg-brand-600"
+                onClick={() => navigate('/login')}
+              >
+                Login
+              </button>
+              <button
+                className="flex-1 px-3 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-700"
+                onClick={() => navigate('/register')}
+              >
+                Register
+              </button>
+            </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
-            title="Sign out"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-          </button>
-        </div>
+        )}
       </div>
     </aside>
   );

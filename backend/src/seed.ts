@@ -13,6 +13,7 @@ export async function seedAdmin(): Promise<void> {
           password: hashedPassword,
           username: 'admin',
           isAdmin: true,
+          isSubscribed: true,
         },
       });
       logger.info('Admin user created: admin@example.com / admin123');

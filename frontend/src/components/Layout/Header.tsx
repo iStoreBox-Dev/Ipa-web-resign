@@ -5,6 +5,7 @@ import { useThemeStore } from '../../store/theme.store';
 const pageTitles: Record<string, string> = {
   '/': 'Resign IPA',
   '/library': 'App Library',
+  '/plans': 'Plans & Upgrade',
   '/certificates': 'Certificates',
   '/account': 'Account',
   '/admin': 'Admin Dashboard',
